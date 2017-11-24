@@ -36,12 +36,6 @@ final class PhpUnitTestAnnotationFixerTest extends AbstractFixerTestCase
     }
 
     /**
-     * Case 1: Notation present, and wanted
-     * Case 2: Notation present, and not wanted
-     * Case 3: Notation not present, but wanted
-     * Case 4: Notation not present, but wanted, and there is already a notation
-     * Case 4: Notation not present, and not wanted
-     *
      * @return array
      */
     public function provideFixCases()
@@ -54,7 +48,7 @@ class Test extends \PhpUnit\FrameWork\TestCase
      * @test
      */
     public function itDoesSomething() {}
-    }', null, [],
+    }', null, ['style' => 'annotation'],
             ],
             ['<?php
 class Test extends \PhpUnit\FrameWork\TestCase
@@ -69,7 +63,7 @@ class Test extends \PhpUnit\FrameWork\TestCase
      * @test
      */
     public function itDoesSomething() {}
-    }', ['annotation' => false],
+    }', ['style' => 'prefix'],
             ],
             [
 '<?php
@@ -84,7 +78,7 @@ class Test extends \PhpUnit\FrameWork\TestCase
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     public function testItDoesSomething() {}
-}', ['annotation' => true],
+}', ['style' => 'annotation'],
             ],
             ['<?php
 class Test extends \PhpUnit\FrameWork\TestCase
@@ -101,14 +95,14 @@ class Test extends \PhpUnit\FrameWork\TestCase
      * @dataProvider blabla
      */
     public function testItDoesSomething() {}
-    }', []
+    }', ['style' => 'annotation'],
             ],
             ['<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     public function testItDoesSomething() {}
-    }', null, ['annotation' => false]
-            ]
+    }', null, [],
+            ],
         ];
     }
 }

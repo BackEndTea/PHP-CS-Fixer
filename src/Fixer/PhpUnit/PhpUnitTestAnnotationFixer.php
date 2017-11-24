@@ -29,7 +29,7 @@ use PhpCsFixer\Tokenizer\TokensAnalyzer;
  */
 final class PhpUnitTestAnnotationFixer extends AbstractFixer implements ConfigurationDefinitionFixerInterface
 {
-    private $callback;
+    private $annotated;
 
     /**
      * {@inheritdoc}
@@ -38,7 +38,7 @@ final class PhpUnitTestAnnotationFixer extends AbstractFixer implements Configur
     {
         parent::configure($configuration);
 
-        $this->callback = $this->configuration['annotation'] ? 'applyTestAnnotation' : 'removeTestAnnotation';
+        $this->annotated = $this->configuration['style'] !== 'prefix';
     }
 
     /**
@@ -52,16 +52,16 @@ final class PhpUnitTestAnnotationFixer extends AbstractFixer implements Configur
                 new CodeSample("<?php
 class Test extends \\PhpUnit\\FrameWork\\TestCase
 {
-public function testItDoesSomething() {}}\n"),
-
-                new CodeSample("<?php
-class Test extends \\PhpUnit\\FrameWork\\TestCase
-{
     /**
      * @test
      */
-    public function itDoesSomething() {} }\n", ['annotation' => false])
-                ]);
+    public function itDoesSomething() {} }\n"),
+                new CodeSample("<?php
+class Test extends \\PhpUnit\\FrameWork\\TestCase
+{
+public function testItDoesSomething() {}}\n",['style' => 'annotation'])
+                ]
+        );
     }
 
     /**
@@ -78,7 +78,11 @@ class Test extends \\PhpUnit\\FrameWork\\TestCase
     protected function applyFix(\SplFileInfo $file, Tokens $tokens)
     {
         foreach (array_reverse($this->findPhpUnitClasses($tokens)) as $indexes) {
-            call_user_func([$this, $this->callback], $tokens, $indexes[0], $indexes[1]);
+            if ($this->annotated) {
+                $this->applyTestAnnotation($tokens, $indexes[0], $indexes[1]);
+            } else {
+                $this->removeTestAnnotation($tokens, $indexes[0], $indexes[1]);
+            }
         }
     }
 
@@ -88,11 +92,11 @@ class Test extends \\PhpUnit\\FrameWork\\TestCase
     protected function createConfigurationDefinition()
     {
         return new FixerConfigurationResolver([
-            (new FixerOptionBuilder('annotation', 'Whether to use the @test annotation or not.'))
-            ->setAllowedValues([true, false])
-            ->setDefault(true)
-            ->setAllowedTypes(['bool'])
-            ->getOption(),
+            (new FixerOptionBuilder('style', 'Whether to use the @test annotation or not.'))
+                ->setAllowedValues(['prefix', 'annotation'])
+                ->setDefault('prefix')
+                ->setAllowedTypes(['string'])
+                ->getOption(),
         ]);
     }
 
