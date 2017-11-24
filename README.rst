@@ -1051,6 +1051,15 @@ Choose from the list of available rules:
     ``['assertAttributeEquals', 'assertAttributeNotEquals', 'assertEquals',
     'assertNotEquals']``
 
+* **php_unit_test_annotation**
+
+  Adds or removes @test annotations from tests, following configuration.
+
+  Configuration options:
+
+  - ``annotation`` (``false``, ``true``): whether to use the @test annotation or not;
+    defaults to ``true``
+
 * **php_unit_test_class_requires_covers**
 
   Adds a default ``@coversNothing`` annotation to PHPUnit test classes that
