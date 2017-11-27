@@ -1057,8 +1057,8 @@ Choose from the list of available rules:
 
   Configuration options:
 
-  - ``annotation`` (``false``, ``true``): whether to use the @test annotation or not;
-    defaults to ``true``
+  - ``style`` (``'annotation'``, ``'prefix'``): whether to use the @test annotation or
+    not; defaults to ``'prefix'``
 
 * **php_unit_test_class_requires_covers**
 

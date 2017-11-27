@@ -41,7 +41,7 @@ final class PhpUnitTestAnnotationFixerTest extends AbstractFixerTestCase
     public function provideFixCases()
     {
         return [
-            ['<?php
+            'Annotation is used, and should be' => ['<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     /**
@@ -50,7 +50,7 @@ class Test extends \PhpUnit\FrameWork\TestCase
     public function itDoesSomething() {}
     }', null, ['style' => 'annotation'],
             ],
-            ['<?php
+            'Annotation is used, and it should not be' => ['<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     /**
@@ -65,7 +65,7 @@ class Test extends \PhpUnit\FrameWork\TestCase
     public function itDoesSomething() {}
     }', ['style' => 'prefix'],
             ],
-            [
+            'Annotation is not used, but should be' => [
 '<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
@@ -80,7 +80,7 @@ class Test extends \PhpUnit\FrameWork\TestCase
     public function testItDoesSomething() {}
 }', ['style' => 'annotation'],
             ],
-            ['<?php
+            'Annotation is not used, but should be, and there is already a docBlcok' => ['<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     /**
@@ -97,11 +97,61 @@ class Test extends \PhpUnit\FrameWork\TestCase
     public function testItDoesSomething() {}
     }', ['style' => 'annotation'],
             ],
-            ['<?php
+            'Annotation is not used, and should not be' => ['<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     public function testItDoesSomething() {}
     }', null, [],
+            ],
+            'Annotation is used, but should not be, and it depends on other tests' => ['<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     */
+    public function testAaa () {}
+
+    /**
+     * @depends testAaa
+     */
+    public function testBbb () {}
+}', '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     * @test
+     */
+    public function aaa () {}
+
+    /**
+     * @test
+     * @depends aaa
+     */
+    public function bbb () {}
+}', ['style' => 'prefix'],
+            ],
+            'Annotation is not used, but should be, and it depends on other tests' => ['<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     * @test
+     */
+    public function aaa () {}
+
+    /**
+     * @test
+     * @depends aaa
+     */
+    public function bbb () {}
+}', '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    public function testAaa () {}
+
+    /**
+     * @depends testAaa
+     */
+    public function testBbb () {}
+}', ['style' => 'annotation'],
             ],
         ];
     }

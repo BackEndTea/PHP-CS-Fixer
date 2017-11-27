@@ -14,6 +14,7 @@ namespace PhpCsFixer\Fixer\PhpUnit;
 
 use PhpCsFixer\AbstractFixer;
 use PhpCsFixer\DocBlock\DocBlock;
+use PhpCsFixer\DocBlock\Line;
 use PhpCsFixer\Fixer\ConfigurationDefinitionFixerInterface;
 use PhpCsFixer\FixerConfiguration\FixerConfigurationResolver;
 use PhpCsFixer\FixerConfiguration\FixerOptionBuilder;
@@ -38,7 +39,7 @@ final class PhpUnitTestAnnotationFixer extends AbstractFixer implements Configur
     {
         parent::configure($configuration);
 
-        $this->annotated = $this->configuration['style'] !== 'prefix';
+        $this->annotated = 'prefix' !== $this->configuration['style'];
     }
 
     /**
@@ -59,7 +60,7 @@ class Test extends \\PhpUnit\\FrameWork\\TestCase
                 new CodeSample("<?php
 class Test extends \\PhpUnit\\FrameWork\\TestCase
 {
-public function testItDoesSomething() {}}\n",['style' => 'annotation'])
+public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
                 ]
         );
     }
@@ -95,7 +96,6 @@ public function testItDoesSomething() {}}\n",['style' => 'annotation'])
             (new FixerOptionBuilder('style', 'Whether to use the @test annotation or not.'))
                 ->setAllowedValues(['prefix', 'annotation'])
                 ->setDefault('prefix')
-                ->setAllowedTypes(['string'])
                 ->getOption(),
         ]);
     }
@@ -106,6 +106,7 @@ public function testItDoesSomething() {}}\n",['style' => 'annotation'])
 
         for ($i = $endIndex - 1; $i > $startIndex; --$i) {
             //ignore non functions
+
             if (!$tokens[$i]->isGivenKind(T_FUNCTION) || $tokensAnalyzer->isLambda($i)) {
                 continue;
             }
@@ -150,8 +151,38 @@ public function testItDoesSomething() {}}\n",['style' => 'annotation'])
             }
             $doc = new DocBlock($tokens[$docBlockIndex]->getContent());
             $lines = $doc->getLines();
+            //Time to check for @depends in the docblock
+            for ($j = 0; $j < \count($lines); ++$j) {
+                //ignore lines that dont have a tag
+                if (!$lines[$j]->containsATag()) {
+                    continue;
+                }
+                $dependsLocation = strpos($lines[$j], '@depends');
+                //ignore the line if it isnt @depends
+                if (false === $dependsLocation) {
+                    continue;
+                }
+                $line = \str_split($lines[$j]->getContent());
+                $counter = \count($line);
+
+                //find the point where the function name starts
+                do {
+                    --$counter;
+                } while (' ' !== $line[$counter]);
+                $dependsFunctionName = implode(array_slice($line, $counter + 1));
+                //Ignore if that functions that dont start with test
+                if (!$this->startsWith('test', $dependsFunctionName)) {
+                    continue;
+                }
+                $dependsFunctionName = implode(array_slice($line, $counter + 5));
+                $dependsFunctionName = lcfirst($dependsFunctionName);
+                array_splice($line, $counter + 1);
+                $lines[$j] = new Line(implode($line).$dependsFunctionName);
+            }
+
             array_splice($lines, 1, 0, $originalIndent." * @test\n");
-            $lines = implode('', $lines);
+            $lines = implode($lines);
+
             $tokens->clearAt($docBlockIndex);
             $tokens->insertAt($docBlockIndex, new Token([T_DOC_COMMENT, $lines]));
         }
@@ -184,12 +215,38 @@ public function testItDoesSomething() {}}\n",['style' => 'annotation'])
             if (!$tokens[$docBlockIndex]->isGivenKind(T_DOC_COMMENT)) {
                 continue;
             }
-            $docBlock = new DocBlock($tokens[$docBlockIndex]->getContent());
-            $lines = $docBlock->getLines();
-            for ($j = 0; $j < count($lines); ++$j) {
+            $doc = new DocBlock($tokens[$docBlockIndex]->getContent());
+            $lines = $doc->getLines();
+            //Time to check for @depends in the docblock
+            for ($j = 0; $j < \count($lines); ++$j) {
                 if (false !== strpos($lines[$j], '@test')) {
                     $lines[$j]->remove();
                 }
+                //ignore lines that dont have a tag
+                if (!$lines[$j]->containsATag()) {
+                    continue;
+                }
+                $dependsLocation = strpos($lines[$j], '@depends');
+                //ignore the line if it isnt @depends
+                if (false === $dependsLocation) {
+                    continue;
+                }
+                $line = \str_split($lines[$j]->getContent());
+                $counter = \count($line);
+
+                //find the point where the function name starts
+                do {
+                    --$counter;
+                } while (' ' !== $line[$counter]);
+                $dependsFunctionName = implode(array_slice($line, $counter + 1));
+                //Ignore if that functions that dont start with test
+                if ($this->startsWith('test', $dependsFunctionName)) {
+                    continue;
+                }
+
+                $dependsFunctionName = 'test'.ucfirst($dependsFunctionName);
+                array_splice($line, $counter + 1);
+                $lines[$j] = new Line(implode($line).$dependsFunctionName);
             }
             $lines = implode($lines);
             $tokens->offsetSet($docBlockIndex, new Token([T_DOC_COMMENT, $lines]));
