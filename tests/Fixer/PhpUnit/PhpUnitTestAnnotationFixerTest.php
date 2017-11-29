@@ -120,7 +120,7 @@ class Test extends \PhpUnit\FrameWork\TestCase
     /**
      */
     public function testAaa () {}
-    
+
     public function helperFunction() {}
 
     /**
@@ -135,7 +135,7 @@ class Test extends \PhpUnit\FrameWork\TestCase
      * @test
      */
     public function aaa () {}
-    
+
     public function helperFunction() {}
 
     /**
@@ -230,7 +230,7 @@ class Test extends \PhpUnit\FrameWork\TestCase
     /**
      */
     public function test_it_has_snake_case() {}
-    
+
     public function helper_function() {}
 }',
                 '<?php
@@ -240,7 +240,7 @@ class Test extends \PhpUnit\FrameWork\TestCase
      * @test
      */
     public function it_has_snake_case() {}
-    
+
     public function helper_function() {}
 }',
                 ['case' => 'snake'],
