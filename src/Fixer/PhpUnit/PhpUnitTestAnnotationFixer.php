@@ -184,8 +184,12 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
                 if (!$this->startsWith('test', $dependsFunctionName)) {
                     continue;
                 }
-                $dependsFunctionName = implode(array_slice($line, $counter + 5));
-                $dependsFunctionName = lcfirst($dependsFunctionName);
+                if ($this->startsWith('test_', $dependsFunctionName)) {
+                    $dependsFunctionName = implode(array_slice($line, $counter + 6));
+                } else {
+                    $dependsFunctionName = implode(array_slice($line, $counter + 5));
+                    $dependsFunctionName = lcfirst($dependsFunctionName);
+                }
                 array_splice($line, $counter + 1);
                 $lines[$j] = new Line(implode($line).$dependsFunctionName);
             }
@@ -253,8 +257,12 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
                 if ($this->startsWith('test', $dependsFunctionName)) {
                     continue;
                 }
+                if(!$this->isCamelCase) {
+                    $dependsFunctionName = 'test_'. $dependsFunctionName;
+                } else {
+                    $dependsFunctionName = 'test'.ucfirst($dependsFunctionName);
+                }
 
-                $dependsFunctionName = 'test'.ucfirst($dependsFunctionName);
                 array_splice($line, $counter + 1);
                 $lines[$j] = new Line(implode($line).$dependsFunctionName);
             }

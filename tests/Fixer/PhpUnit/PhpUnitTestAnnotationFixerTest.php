@@ -244,7 +244,62 @@ class Test extends \PhpUnit\FrameWork\TestCase
     public function helper_function() {}
 }',
                 ['case' => 'snake'],
-            ],
+                ],
+                'Annotation gets added, it has an @depends, and we use snake case' => [
+                    '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     * @test
+     */
+    public function works_fine () {}
+
+    /**
+     * @test
+     * @depends works_fine
+     */
+    public function works_fine_too() {}
+}',
+                    '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    public function test_works_fine () {}
+
+    /**
+     * @depends test_works_fine
+     */
+    public function test_works_fine_too() {}
+}',
+                    ['style' => 'annotation']
+                    ],
+                'Annotation gets removed, it has an @depends and we use camel case' => [
+                    '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     */
+    public function test_works_fine () {}
+
+    /**
+     * @depends test_works_fine
+     */
+    public function test_works_fine_too() {}
+}',
+                        '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     * @test
+     */
+    public function works_fine () {}
+
+    /**
+     * @depends works_fine
+     */
+    public function works_fine_too() {}
+}',
+                    ['case' =>'snake']
+                ]
         ];
     }
 }
