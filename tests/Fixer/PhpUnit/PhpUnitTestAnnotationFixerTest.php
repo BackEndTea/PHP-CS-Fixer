@@ -29,7 +29,7 @@ final class PhpUnitTestAnnotationFixerTest extends AbstractFixerTestCase
      * @param mixed $expected
      * @param mixed $input
      */
-    public function testFix($expected, $input, array $config)
+    public function testFix($expected, $input = null, array $config = [])
     {
         $this->fixer->configure($config);
         $this->doTest($expected, $input);
@@ -41,29 +41,35 @@ final class PhpUnitTestAnnotationFixerTest extends AbstractFixerTestCase
     public function provideFixCases()
     {
         return [
-            'Annotation is used, and should be' => ['<?php
+            'Annotation is used, and should be' => [
+                '<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     /**
      * @test
      */
     public function itDoesSomething() {}
-    }', null, ['style' => 'annotation'],
+    }',
+                null,
+                ['style' => 'annotation'],
             ],
-            'Annotation is used, and it should not be' => ['<?php
+            'Annotation is used, and it should not be' => [
+                '<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     /**
      */
     public function testItDoesSomething() {}
-    }', '<?php
+    }',
+                '<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     /**
      * @test
      */
     public function itDoesSomething() {}
-    }', ['style' => 'prefix'],
+    }',
+                ['style' => 'prefix'],
             ],
             'Annotation is not used, but should be' => [
 '<?php
@@ -80,7 +86,8 @@ class Test extends \PhpUnit\FrameWork\TestCase
     public function testItDoesSomething() {}
 }', ['style' => 'annotation'],
             ],
-            'Annotation is not used, but should be, and there is already a docBlcok' => ['<?php
+            'Annotation is not used, but should be, and there is already a docBlcok' => [
+                '<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     /**
@@ -88,33 +95,59 @@ class Test extends \PhpUnit\FrameWork\TestCase
      * @dataProvider blabla
      */
     public function itDoesSomething() {}
-    }', '<?php
+    }',
+                '<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     /**
      * @dataProvider blabla
      */
     public function testItDoesSomething() {}
-    }', ['style' => 'annotation'],
+    }',
+                ['style' => 'annotation'],
             ],
-            'Annotation is not used, and should not be' => ['<?php
+            'Annotation is not used, and should not be' => [
+                '<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     public function testItDoesSomething() {}
-    }', null, [],
+    }',
             ],
-            'Annotation is used, but should not be, and it depends on other tests' => ['<?php
+            'Annotation is used, but should not be, and it depends on other tests' => [
+                '<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     /**
      */
     public function testAaa () {}
+    
+    public function helperFunction() {}
 
     /**
      * @depends testAaa
      */
     public function testBbb () {}
-}', '<?php
+}',
+                '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     * @test
+     */
+    public function aaa () {}
+    
+    public function helperFunction() {}
+
+    /**
+     * @test
+     * @depends aaa
+     */
+    public function bbb () {}
+}',
+                ['style' => 'prefix'],
+            ],
+            'Annotation is not used, but should be, and it depends on other tests' => [
+                '<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     /**
@@ -127,22 +160,8 @@ class Test extends \PhpUnit\FrameWork\TestCase
      * @depends aaa
      */
     public function bbb () {}
-}', ['style' => 'prefix'],
-            ],
-            'Annotation is not used, but should be, and it depends on other tests' => ['<?php
-class Test extends \PhpUnit\FrameWork\TestCase
-{
-    /**
-     * @test
-     */
-    public function aaa () {}
-
-    /**
-     * @test
-     * @depends aaa
-     */
-    public function bbb () {}
-}', '<?php
+}',
+                '<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     public function testAaa () {}
@@ -151,7 +170,80 @@ class Test extends \PhpUnit\FrameWork\TestCase
      * @depends testAaa
      */
     public function testBbb () {}
+}',
+                ['style' => 'annotation'],
+            ],
+            'Annotation is removed, the function is one word and we want it to use camel case' => [
+                '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     */
+    public function testWorks() {}
+}',
+                '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     * @test
+     */
+    public function works() {}
+}',
+            ],
+            'Annotation is removed, the function is one word and we want it to use snake case' => [
+                '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     */
+    public function test_works() {}
+}',
+                '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     * @test
+     */
+    public function works() {}
+}',
+                ['case' => 'snake'],
+                ],
+            'Annotation is added, and it is snake case' => [
+                '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     * @test
+     */
+    public function it_has_snake_case() {}
+}',
+                '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    public function test_it_has_snake_case() {}
 }', ['style' => 'annotation'],
+            ],
+            'Annotation is removed, and it is snake case' => [
+                '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     */
+    public function test_it_has_snake_case() {}
+    
+    public function helper_function() {}
+}',
+                '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     * @test
+     */
+    public function it_has_snake_case() {}
+    
+    public function helper_function() {}
+}',
+                ['case' => 'snake'],
             ],
         ];
     }

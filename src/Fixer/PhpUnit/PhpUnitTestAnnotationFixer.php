@@ -32,6 +32,8 @@ final class PhpUnitTestAnnotationFixer extends AbstractFixer implements Configur
 {
     private $annotated;
 
+    private $isCamelCase;
+
     /**
      * {@inheritdoc}
      */
@@ -40,6 +42,7 @@ final class PhpUnitTestAnnotationFixer extends AbstractFixer implements Configur
         parent::configure($configuration);
 
         $this->annotated = 'prefix' !== $this->configuration['style'];
+        $this->isCamelCase = 'camel' === $this->configuration['case'];
     }
 
     /**
@@ -97,6 +100,10 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
                 ->setAllowedValues(['prefix', 'annotation'])
                 ->setDefault('prefix')
                 ->getOption(),
+            (new FixerOptionBuilder('case', 'Whether to camel or snake case when adding the test prefix'))
+                ->setAllowedValues(['camel', 'snake'])
+                ->setDefault('camel')
+                ->getOption(),
         ]);
     }
 
@@ -127,8 +134,11 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
             if (!$this->startsWith('test', $functionName)) {
                 continue;
             }
-
-            $functionName = preg_replace('{test}', '', $functionName, 1);
+            if ($this->startsWith('test_', $functionName)) {
+                $functionName = preg_replace('{test_}', '', $functionName, 1);
+            } else {
+                $functionName = preg_replace('{test}', '', $functionName, 1);
+            }
             $newFunctionName = lcfirst($functionName);
             $newFunctionNameToken = new Token([T_STRING, $newFunctionName]);
             $tokens->offsetSet($functionNameIndex, $newFunctionNameToken);
@@ -255,6 +265,14 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
             $functionName = $tokens[$functionNameIndex]->getContent();
             //ignore functions that start with test
             if ($this->startsWith('test', $functionName)) {
+                continue;
+            }
+
+            //Deal with snake case
+            if (!$this->isCamelCase) {
+                $newFunctionName = 'test_'.$functionName;
+                $tokens->offsetSet($functionNameIndex, new Token([T_STRING, $newFunctionName]));
+
                 continue;
             }
             $functionName = ucfirst($functionName);
