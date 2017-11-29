@@ -1057,6 +1057,8 @@ Choose from the list of available rules:
 
   Configuration options:
 
+  - ``case`` (``'camel'``, ``'snake'``): whether to camel or snake case when adding the
+    test prefix; defaults to ``'camel'``
   - ``style`` (``'annotation'``, ``'prefix'``): whether to use the @test annotation or
     not; defaults to ``'prefix'``
 
