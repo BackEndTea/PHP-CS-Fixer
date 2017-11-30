@@ -167,7 +167,7 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
             }
 
             $newFunctionName = $this->removeTestFromFunctionName($functionName);
-            $tokens->offsetSet($functionNameIndex, new Token([T_STRING, $newFunctionName]));
+            $tokens[$functionNameIndex] = new Token([T_STRING, $newFunctionName]);
 
             $docBlockIndex = $this->getDockBlockIndex($tokens, $i);
 
@@ -186,7 +186,7 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
                 array_splice($lines, 1, 0, $originalIndent." * @test\n");
             }
             $lines = implode($lines);
-            $tokens->offsetSet($docBlockIndex, new Token([T_DOC_COMMENT, $lines]));
+            $tokens[$docBlockIndex] = new Token([T_DOC_COMMENT, $lines]);
         }
     }
 
@@ -202,7 +202,7 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
             $lines = $this->updateDocBlock($tokens, $docBlockIndex);
 
             $lines = implode($lines);
-            $tokens->offsetSet($docBlockIndex, new Token([T_DOC_COMMENT, $lines]));
+            $tokens[$docBlockIndex] = new Token([T_DOC_COMMENT, $lines]);
 
             $functionNameIndex = $tokens->getNextMeaningfulToken($i);
             $functionName = $tokens[$functionNameIndex]->getContent();
@@ -213,7 +213,7 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
             }
 
             $newFunctionName = $this->addTestToFunctionName($functionName);
-            $tokens->offsetSet($functionNameIndex, new Token([T_STRING, $newFunctionName]));
+            $tokens[$functionNameIndex] = new Token([T_STRING, $newFunctionName]);
         }
     }
 
@@ -310,10 +310,11 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
     {
         $originalIndent = $this->detectIndent($tokens, $tokens->getNextNonWhitespace($docBlockIndex));
         $toInsert = [
-            new Token([T_WHITESPACE, "\n".$originalIndent]),
             new Token([T_DOC_COMMENT, "/**\n$originalIndent * @test\n$originalIndent */"]),
+            new Token([T_WHITESPACE, "\n".$originalIndent]),
         ];
-        $tokens->insertAt($docBlockIndex + 1, $toInsert);
+        $index = $tokens->getNextMeaningfulToken($docBlockIndex);
+        $tokens->insertAt($index, $toInsert);
     }
 
     /**

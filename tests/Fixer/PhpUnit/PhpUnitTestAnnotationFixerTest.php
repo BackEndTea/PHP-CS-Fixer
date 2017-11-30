@@ -311,10 +311,10 @@ class Test extends \PhpUnit\FrameWork\TestCase
      * @test
      */
     public function snake_cased () {}
+
     /**
      * @test
      */
-
     public function camelCased () {}
 
     /**
@@ -362,10 +362,10 @@ class Test extends \PhpUnit\FrameWork\TestCase
      * @test
      */
     public function itWorks() {}
+
     /**
      * @test
      */
-
     public function itDoesSomething() {}
 }',
                 '<?php
@@ -376,6 +376,51 @@ class Test extends \PhpUnit\FrameWork\TestCase
     public function testItDoesSomething() {}
 }',
                 ['style' => 'annotation'],
+            ],
+            'Annotation has to be removed from multiple functions and we use snake case' => [
+                '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     */
+    public function test_it_works() {}
+
+    /**
+     */
+    public function test_it_does_something() {}
+
+    public function dataProvider() {}
+
+    /**
+     * @dataprovider dataProvider
+     * @depends test_it_does_something
+     */
+    public function test_it_depend_and_has_provider() {}
+
+}',
+                '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     * @test
+     */
+    public function it_works() {}
+
+    /**
+     * @test
+     */
+    public function it_does_something() {}
+
+    public function dataProvider() {}
+
+    /**
+     * @dataprovider dataProvider
+     * @depends it_does_something
+     */
+    public function test_it_depend_and_has_provider() {}
+
+}',
+                ['case' => 'snake'],
             ],
         ];
     }
