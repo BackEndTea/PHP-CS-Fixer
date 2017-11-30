@@ -77,50 +77,6 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
     }
 
     /**
-     * @param Tokens $tokens
-     * @param $index
-     *
-     * @return bool
-     */
-    public function doesFunctionHaveDocBlock(Tokens $tokens, $index)
-    {
-        $docBlockIndex = $this->getDockBlockIndex($tokens, $index);
-
-        return $tokens[$docBlockIndex]->isGivenKind(T_DOC_COMMENT);
-    }
-
-    public function getDockBlockIndex(Tokens $tokens, $index)
-    {
-        do {
-            $index = $tokens->getPrevNonWhitespace($index);
-        } while ($tokens[$index]->isGivenKind([T_PUBLIC, T_PROTECTED, T_PRIVATE, T_FINAL, T_ABSTRACT, T_COMMENT]));
-
-        return $index;
-    }
-
-    /**
-     * @param Tokens $tokens
-     * @param $index
-     *
-     * @return bool
-     */
-    public function shouldBeChecked(Tokens $tokens, $index)
-    {
-        $tokensAnalyzer = new TokensAnalyzer($tokens);
-        if (!$tokens[$index]->isGivenKind(T_FUNCTION) || $tokensAnalyzer->isLambda($index)) {
-            return false;
-        }
-
-        // ignore abstract functions
-        $braceIndex = $tokens->getNextTokenOfKind($index, [';', '{']);
-        if (!$tokens[$braceIndex]->equals('{')) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
      * {@inheritdoc}
      */
     protected function applyFix(\SplFileInfo $file, Tokens $tokens)
@@ -151,11 +107,53 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
         ]);
     }
 
+    /**
+     * @param Tokens $tokens
+     * @param $index
+     *
+     * @return bool
+     */
+    private function doesFunctionHaveDocBlock(Tokens $tokens, $index)
+    {
+        $docBlockIndex = $this->getDockBlockIndex($tokens, $index);
+
+        return $tokens[$docBlockIndex]->isGivenKind(T_DOC_COMMENT);
+    }
+
+    private function getDockBlockIndex(Tokens $tokens, $index)
+    {
+        do {
+            $index = $tokens->getPrevNonWhitespace($index);
+        } while ($tokens[$index]->isGivenKind([T_PUBLIC, T_PROTECTED, T_PRIVATE, T_FINAL, T_ABSTRACT, T_COMMENT]));
+
+        return $index;
+    }
+
+    /**
+     * @param Tokens $tokens
+     * @param $index
+     *
+     * @return bool
+     */
+    private function shouldBeChecked(Tokens $tokens, $index)
+    {
+        $tokensAnalyzer = new TokensAnalyzer($tokens);
+        if (!$tokens[$index]->isGivenKind(T_FUNCTION) || $tokensAnalyzer->isLambda($index)) {
+            return false;
+        }
+
+        // ignore abstract functions
+        $braceIndex = $tokens->getNextTokenOfKind($index, [';', '{']);
+        if (!$tokens[$braceIndex]->equals('{')) {
+            return false;
+        }
+
+        return true;
+    }
+
     private function applyTestAnnotation(Tokens $tokens, $startIndex, $endIndex)
     {
         for ($i = $endIndex - 1; $i > $startIndex; --$i) {
-            //ignore non functions
-
             if (!$this->shouldBeChecked($tokens, $i)) {
                 continue;
             }
@@ -167,11 +165,10 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
             if (!$this->startsWith('test', $functionName)) {
                 continue;
             }
-            $newFunctionName = $this->removeTestFromFunctionName($functionName);
-            $newFunctionNameToken = new Token([T_STRING, $newFunctionName]);
-            $tokens->offsetSet($functionNameIndex, $newFunctionNameToken);
 
-            //Time to update docblocks
+            $newFunctionName = $this->removeTestFromFunctionName($functionName);
+            $tokens->offsetSet($functionNameIndex, new Token([T_STRING, $newFunctionName]));
+
             $docBlockIndex = $this->getDockBlockIndex($tokens, $i);
 
             //Create a new docblock if it didn't have one before;
@@ -181,43 +178,11 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
                 continue;
             }
 
-            $originalIndent = $this->detectIndent($tokens, $tokens->getNextNonWhitespace($docBlockIndex));
             $doc = new DocBlock($tokens[$docBlockIndex]->getContent());
-            $lines = $doc->getLines();
-            $hasTest = false;
-            //Time to check for @depends in the docblock
-            for ($j = 0; $j < \count($lines); ++$j) {
-                //ignore lines that dont have a tag
-                if (!$lines[$j]->containsATag()) {
-                    continue;
-                }
-                //If the docblock already has @test we don't need to add it again
-                if (false !== strpos($lines[$j], '@test')) {
-                    $hasTest = true;
-                }
-                $dependsLocation = strpos($lines[$j], '@depends');
-                //ignore the line if it isnt @depends
-                if (false === $dependsLocation) {
-                    continue;
-                }
-                $line = \str_split($lines[$j]->getContent());
-                $counter = \count($line);
+            $lines = $this->updateDocBlock($tokens, $docBlockIndex);
 
-                //find the point where the function name starts
-                do {
-                    --$counter;
-                } while (' ' !== $line[$counter]);
-                $dependsFunctionName = implode(array_slice($line, $counter + 1));
-                //Ignore if that functions that dont start with test
-                if (!$this->startsWith('test', $dependsFunctionName)) {
-                    continue;
-                }
-                $dependsFunctionName = $this->removeTestFromFunctionName($dependsFunctionName);
-
-                array_splice($line, $counter + 1);
-                $lines[$j] = new Line(implode($line).$dependsFunctionName);
-            }
-            if (!$hasTest) {
+            if (false === strpos($doc->getContent(), '@test')) {
+                $originalIndent = $this->detectIndent($tokens, $tokens->getNextNonWhitespace($docBlockIndex));
                 array_splice($lines, 1, 0, $originalIndent." * @test\n");
             }
             $lines = implode($lines);
@@ -228,51 +193,20 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
     private function removeTestAnnotation(Tokens $tokens, $startIndex, $endIndex)
     {
         for ($i = $endIndex - 1; $i > $startIndex; --$i) {
-            //ignore non functions
             if (!$this->shouldBeChecked($tokens, $i) || !$this->doesFunctionHaveDocBlock($tokens, $i)) {
                 continue;
             }
 
             $docBlockIndex = $this->getDockBlockIndex($tokens, $i);
 
-            $doc = new DocBlock($tokens[$docBlockIndex]->getContent());
-            $lines = $doc->getLines();
-            //Time to check for @depends in the docblock
-            for ($j = 0; $j < \count($lines); ++$j) {
-                if (false !== strpos($lines[$j], '@test')) {
-                    $lines[$j]->remove();
-                }
-                //ignore lines that dont have a tag
-                if (!$lines[$j]->containsATag()) {
-                    continue;
-                }
-                $dependsLocation = strpos($lines[$j], '@depends');
-                //ignore the line if it isnt @depends
-                if (false === $dependsLocation) {
-                    continue;
-                }
-                $line = \str_split($lines[$j]->getContent());
-                $counter = \count($line);
+            $lines = $this->updateDocBlock($tokens, $docBlockIndex);
 
-                //find the point where the function name starts
-                do {
-                    --$counter;
-                } while (' ' !== $line[$counter]);
-                $dependsFunctionName = implode(array_slice($line, $counter + 1));
-                //Ignore if that functions that dont start with test
-                if ($this->startsWith('test', $dependsFunctionName)) {
-                    continue;
-                }
-                $dependsFunctionName = $this->addTestToFunctionName($dependsFunctionName);
-
-                array_splice($line, $counter + 1);
-                $lines[$j] = new Line(implode($line).$dependsFunctionName);
-            }
             $lines = implode($lines);
             $tokens->offsetSet($docBlockIndex, new Token([T_DOC_COMMENT, $lines]));
 
             $functionNameIndex = $tokens->getNextMeaningfulToken($i);
             $functionName = $tokens[$functionNameIndex]->getContent();
+
             //if the function already starts with test were done
             if ($this->startsWith('test', $functionName)) {
                 continue;
@@ -343,9 +277,9 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
     private function removeTestFromFunctionName($functionName)
     {
         if ($this->startsWith('test_', $functionName)) {
-            $newFunctionName = preg_replace('{test_}', '', $functionName, 1);
+            $newFunctionName = substr($functionName, 5);
         } else {
-            $functionName = preg_replace('{test}', '', $functionName, 1);
+            $functionName = substr($functionName, 4);
             $newFunctionName = lcfirst($functionName);
         }
 
@@ -380,5 +314,61 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
             new Token([T_DOC_COMMENT, "/**\n$originalIndent * @test\n$originalIndent */"]),
         ];
         $tokens->insertAt($docBlockIndex + 1, $toInsert);
+    }
+
+    /**
+     * @param Tokens $tokens
+     * @param $docBlockIndex
+     *
+     * @return Line[]
+     */
+    private function updateDocBlock(Tokens $tokens, $docBlockIndex)
+    {
+        $doc = new DocBlock($tokens[$docBlockIndex]->getContent());
+
+        $lines = $doc->getLines();
+        for ($j = 0; $j < \count($lines); ++$j) {
+            //ignore lines that dont have a tag
+            if (!$lines[$j]->containsATag()) {
+                continue;
+            }
+            if (!$this->annotated) {
+                if (false !== strpos($lines[$j], '@test')) {
+                    $lines[$j]->remove();
+                }
+            }
+            //ignore the line if it isnt @depends
+            if (false === strpos($lines[$j], '@depends')) {
+                continue;
+            }
+            $line = \str_split($lines[$j]->getContent());
+            $counter = \count($line);
+
+            //find the point where the function name starts
+            do {
+                --$counter;
+            } while (' ' !== $line[$counter]);
+            $dependsFunctionName = implode(array_slice($line, $counter + 1));
+            //Ignore if that functions that dont start with test
+            if ($this->annotated) {
+                if (!$this->startsWith('test', $dependsFunctionName)) {
+                    continue;
+                }
+                $dependsFunctionName = $this->removeTestFromFunctionName($dependsFunctionName);
+                array_splice($line, $counter + 1);
+                $lines[$j] = new Line(implode($line).$dependsFunctionName);
+
+                continue;
+            }
+            if ($this->startsWith('test', $dependsFunctionName)) {
+                continue;
+            }
+            $dependsFunctionName = $this->addTestToFunctionName($dependsFunctionName);
+
+            array_splice($line, $counter + 1);
+            $lines[$j] = new Line(implode($line).$dependsFunctionName);
+        }
+
+        return $lines;
     }
 }
