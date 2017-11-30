@@ -41,7 +41,7 @@ final class PhpUnitTestAnnotationFixer extends AbstractFixer implements Configur
     {
         parent::configure($configuration);
 
-        $this->annotated = 'prefix' !== $this->configuration['style'];
+        $this->annotated = 'annotation' === $this->configuration['style'];
         $this->isCamelCase = 'camel' === $this->configuration['case'];
     }
 
@@ -77,6 +77,50 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
     }
 
     /**
+     * @param Tokens $tokens
+     * @param $index
+     *
+     * @return bool
+     */
+    public function doesFunctionHaveDocBlock(Tokens $tokens, $index)
+    {
+        $docBlockIndex = $this->getDockBlockIndex($tokens, $index);
+
+        return $tokens[$docBlockIndex]->isGivenKind(T_DOC_COMMENT);
+    }
+
+    public function getDockBlockIndex(Tokens $tokens, $index)
+    {
+        do {
+            $index = $tokens->getPrevNonWhitespace($index);
+        } while ($tokens[$index]->isGivenKind([T_PUBLIC, T_PROTECTED, T_PRIVATE, T_FINAL, T_ABSTRACT, T_COMMENT]));
+
+        return $index;
+    }
+
+    /**
+     * @param Tokens $tokens
+     * @param $index
+     *
+     * @return bool
+     */
+    public function shouldBeChecked(Tokens $tokens, $index)
+    {
+        $tokensAnalyzer = new TokensAnalyzer($tokens);
+        if (!$tokens[$index]->isGivenKind(T_FUNCTION) || $tokensAnalyzer->isLambda($index)) {
+            return false;
+        }
+
+        // ignore abstract functions
+        $braceIndex = $tokens->getNextTokenOfKind($index, [';', '{']);
+        if (!$tokens[$braceIndex]->equals('{')) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * {@inheritdoc}
      */
     protected function applyFix(\SplFileInfo $file, Tokens $tokens)
@@ -109,63 +153,47 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
 
     private function applyTestAnnotation(Tokens $tokens, $startIndex, $endIndex)
     {
-        $tokensAnalyzer = new TokensAnalyzer($tokens);
-
         for ($i = $endIndex - 1; $i > $startIndex; --$i) {
             //ignore non functions
 
-            if (!$tokens[$i]->isGivenKind(T_FUNCTION) || $tokensAnalyzer->isLambda($i)) {
+            if (!$this->shouldBeChecked($tokens, $i)) {
                 continue;
             }
 
-            $functionIndex = $i;
-            $docBlockIndex = $i;
-
-            // ignore abstract functions
-            $braceIndex = $tokens->getNextTokenOfKind($functionIndex, [';', '{']);
-            if (!$tokens[$braceIndex]->equals('{')) {
-                continue;
-            }
-
-            $functionNameIndex = $tokens->getNextMeaningfulToken($functionIndex);
+            $functionNameIndex = $tokens->getNextMeaningfulToken($i);
             $functionName = $tokens[$functionNameIndex]->getContent();
 
             //ignore functions that don't start with test
             if (!$this->startsWith('test', $functionName)) {
                 continue;
             }
-            if ($this->startsWith('test_', $functionName)) {
-                $functionName = preg_replace('{test_}', '', $functionName, 1);
-            } else {
-                $functionName = preg_replace('{test}', '', $functionName, 1);
-            }
-            $newFunctionName = lcfirst($functionName);
+            $newFunctionName = $this->removeTestFromFunctionName($functionName);
             $newFunctionNameToken = new Token([T_STRING, $newFunctionName]);
             $tokens->offsetSet($functionNameIndex, $newFunctionNameToken);
 
-            //We removed test from the function name, now we have to update the doc blocks
-            do {
-                $docBlockIndex = $tokens->getPrevNonWhitespace($docBlockIndex);
-            } while ($tokens[$docBlockIndex]->isGivenKind([T_PUBLIC, T_PROTECTED, T_PRIVATE, T_FINAL, T_ABSTRACT, T_COMMENT]));
+            //Time to update docblocks
+            $docBlockIndex = $this->getDockBlockIndex($tokens, $i);
 
-            $originalIndent = $this->detectIndent($tokens, $tokens->getNextNonWhitespace($docBlockIndex));
-            //If the function didn't have a DocBlock Before
-            if (!$tokens[$docBlockIndex]->isGivenKind(T_DOC_COMMENT)) {
-                $toInsert = [
-                    new Token([T_WHITESPACE, "\n".$originalIndent]),
-                    new Token([T_DOC_COMMENT, "/**\n$originalIndent * @test\n$originalIndent */"]),
-                ];
-                $tokens->insertAt($docBlockIndex + 1, $toInsert);
+            //Create a new docblock if it didn't have one before;
+            if (!$this->doesFunctionHaveDocBlock($tokens, $i)) {
+                $this->createDocBlock($tokens, $docBlockIndex);
 
                 continue;
             }
+
+            $originalIndent = $this->detectIndent($tokens, $tokens->getNextNonWhitespace($docBlockIndex));
             $doc = new DocBlock($tokens[$docBlockIndex]->getContent());
             $lines = $doc->getLines();
+            $hasTest = false;
             //Time to check for @depends in the docblock
             for ($j = 0; $j < \count($lines); ++$j) {
                 //ignore lines that dont have a tag
                 if (!$lines[$j]->containsATag()) {
                     continue;
+                }
+                //If the docblock already has @test we don't need to add it again
+                if (false !== strpos($lines[$j], '@test')) {
+                    $hasTest = true;
                 }
                 $dependsLocation = strpos($lines[$j], '@depends');
                 //ignore the line if it isnt @depends
@@ -184,51 +212,29 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
                 if (!$this->startsWith('test', $dependsFunctionName)) {
                     continue;
                 }
-                if ($this->startsWith('test_', $dependsFunctionName)) {
-                    $dependsFunctionName = implode(array_slice($line, $counter + 6));
-                } else {
-                    $dependsFunctionName = implode(array_slice($line, $counter + 5));
-                    $dependsFunctionName = lcfirst($dependsFunctionName);
-                }
+                $dependsFunctionName = $this->removeTestFromFunctionName($dependsFunctionName);
+
                 array_splice($line, $counter + 1);
                 $lines[$j] = new Line(implode($line).$dependsFunctionName);
             }
-
-            array_splice($lines, 1, 0, $originalIndent." * @test\n");
+            if (!$hasTest) {
+                array_splice($lines, 1, 0, $originalIndent." * @test\n");
+            }
             $lines = implode($lines);
-
-            $tokens->clearAt($docBlockIndex);
-            $tokens->insertAt($docBlockIndex, new Token([T_DOC_COMMENT, $lines]));
+            $tokens->offsetSet($docBlockIndex, new Token([T_DOC_COMMENT, $lines]));
         }
     }
 
     private function removeTestAnnotation(Tokens $tokens, $startIndex, $endIndex)
     {
-        $tokensAnalyzer = new TokensAnalyzer($tokens);
-
         for ($i = $endIndex - 1; $i > $startIndex; --$i) {
             //ignore non functions
-            if (!$tokens[$i]->isGivenKind(T_FUNCTION) || $tokensAnalyzer->isLambda($i)) {
+            if (!$this->shouldBeChecked($tokens, $i) || !$this->doesFunctionHaveDocBlock($tokens, $i)) {
                 continue;
             }
 
-            $functionIndex = $i;
-            $docBlockIndex = $i;
+            $docBlockIndex = $this->getDockBlockIndex($tokens, $i);
 
-            // ignore abstract functions
-            $braceIndex = $tokens->getNextTokenOfKind($functionIndex, [';', '{']);
-            if (!$tokens[$braceIndex]->equals('{')) {
-                continue;
-            }
-
-            do {
-                $docBlockIndex = $tokens->getPrevNonWhitespace($docBlockIndex);
-            } while ($tokens[$docBlockIndex]->isGivenKind([T_PUBLIC, T_PROTECTED, T_PRIVATE, T_FINAL, T_ABSTRACT, T_COMMENT]));
-
-            //ignore functions that don't have a dockBlock
-            if (!$tokens[$docBlockIndex]->isGivenKind(T_DOC_COMMENT)) {
-                continue;
-            }
             $doc = new DocBlock($tokens[$docBlockIndex]->getContent());
             $lines = $doc->getLines();
             //Time to check for @depends in the docblock
@@ -257,11 +263,7 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
                 if ($this->startsWith('test', $dependsFunctionName)) {
                     continue;
                 }
-                if(!$this->isCamelCase) {
-                    $dependsFunctionName = 'test_'. $dependsFunctionName;
-                } else {
-                    $dependsFunctionName = 'test'.ucfirst($dependsFunctionName);
-                }
+                $dependsFunctionName = $this->addTestToFunctionName($dependsFunctionName);
 
                 array_splice($line, $counter + 1);
                 $lines[$j] = new Line(implode($line).$dependsFunctionName);
@@ -269,22 +271,14 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
             $lines = implode($lines);
             $tokens->offsetSet($docBlockIndex, new Token([T_DOC_COMMENT, $lines]));
 
-            $functionNameIndex = $tokens->getNextMeaningfulToken($functionIndex);
+            $functionNameIndex = $tokens->getNextMeaningfulToken($i);
             $functionName = $tokens[$functionNameIndex]->getContent();
-            //ignore functions that start with test
+            //if the function already starts with test were done
             if ($this->startsWith('test', $functionName)) {
                 continue;
             }
 
-            //Deal with snake case
-            if (!$this->isCamelCase) {
-                $newFunctionName = 'test_'.$functionName;
-                $tokens->offsetSet($functionNameIndex, new Token([T_STRING, $newFunctionName]));
-
-                continue;
-            }
-            $functionName = ucfirst($functionName);
-            $newFunctionName = 'test'.$functionName;
+            $newFunctionName = $this->addTestToFunctionName($functionName);
             $tokens->offsetSet($functionNameIndex, new Token([T_STRING, $newFunctionName]));
         }
     }
@@ -339,5 +333,52 @@ public function testItDoesSomething() {}}\n", ['style' => 'annotation']),
         $explodedContent = explode("\n", $tokens[$index - 1]->getContent());
 
         return end($explodedContent);
+    }
+
+    /**
+     * @param string $functionName
+     *
+     * @return string
+     */
+    private function removeTestFromFunctionName($functionName)
+    {
+        if ($this->startsWith('test_', $functionName)) {
+            $newFunctionName = preg_replace('{test_}', '', $functionName, 1);
+        } else {
+            $functionName = preg_replace('{test}', '', $functionName, 1);
+            $newFunctionName = lcfirst($functionName);
+        }
+
+        return $newFunctionName;
+    }
+
+    /**
+     * @param string $functionName
+     *
+     * @return string
+     */
+    private function addTestToFunctionName($functionName)
+    {
+        if (!$this->isCamelCase) {
+            $newFunctionName = 'test_'.$functionName;
+        } else {
+            $newFunctionName = 'test'.ucfirst($functionName);
+        }
+
+        return $newFunctionName;
+    }
+
+    /**
+     * @param Tokens $tokens
+     * @param $docBlockIndex
+     */
+    private function createDocBlock(Tokens $tokens, $docBlockIndex)
+    {
+        $originalIndent = $this->detectIndent($tokens, $tokens->getNextNonWhitespace($docBlockIndex));
+        $toInsert = [
+            new Token([T_WHITESPACE, "\n".$originalIndent]),
+            new Token([T_DOC_COMMENT, "/**\n$originalIndent * @test\n$originalIndent */"]),
+        ];
+        $tokens->insertAt($docBlockIndex + 1, $toInsert);
     }
 }

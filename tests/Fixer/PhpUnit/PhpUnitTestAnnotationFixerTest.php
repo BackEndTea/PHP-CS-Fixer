@@ -28,6 +28,7 @@ final class PhpUnitTestAnnotationFixerTest extends AbstractFixerTestCase
      *
      * @param mixed $expected
      * @param mixed $input
+     * @param array $config
      */
     public function testFix($expected, $input = null, array $config = [])
     {
@@ -72,7 +73,7 @@ class Test extends \PhpUnit\FrameWork\TestCase
                 ['style' => 'prefix'],
             ],
             'Annotation is not used, but should be' => [
-'<?php
+                '<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     /**
@@ -80,11 +81,12 @@ class Test extends \PhpUnit\FrameWork\TestCase
      */
     public function itDoesSomething() {}
 }',
-'<?php
+                '<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     public function testItDoesSomething() {}
-}', ['style' => 'annotation'],
+}',
+                ['style' => 'annotation'],
             ],
             'Annotation is not used, but should be, and there is already a docBlcok' => [
                 '<?php
@@ -207,7 +209,7 @@ class Test extends \PhpUnit\FrameWork\TestCase
     public function works() {}
 }',
                 ['case' => 'snake'],
-                ],
+            ],
             'Annotation is added, and it is snake case' => [
                 '<?php
 class Test extends \PhpUnit\FrameWork\TestCase
@@ -221,7 +223,8 @@ class Test extends \PhpUnit\FrameWork\TestCase
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     public function test_it_has_snake_case() {}
-}', ['style' => 'annotation'],
+}',
+                ['style' => 'annotation'],
             ],
             'Annotation is removed, and it is snake case' => [
                 '<?php
@@ -270,7 +273,7 @@ class Test extends \PhpUnit\FrameWork\TestCase
      */
     public function test_works_fine_too() {}
 }',
-                    ['style' => 'annotation']
+                    ['style' => 'annotation'],
                     ],
                 'Annotation gets removed, it has an @depends and we use camel case' => [
                     '<?php
@@ -298,8 +301,82 @@ class Test extends \PhpUnit\FrameWork\TestCase
      */
     public function works_fine_too() {}
 }',
-                    ['case' =>'snake']
-                ]
+                    ['case' => 'snake'],
+                ],
+            'Class has both camel and snake case, annotated functions and not, and wants to add annotations' => [
+                '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     * @test
+     */
+    public function snake_cased () {}
+    /**
+     * @test
+     */
+
+    public function camelCased () {}
+
+    /**
+     * @test
+     * @depends camelCased
+     */
+    public function depends_on_someone () {}
+
+    //It even has a comment
+    public function a_helper_function () {}
+
+    /**
+     * @test
+     * @depends depends_on_someone
+     */
+    public function moreDepends() {}
+}',
+                '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    public function test_snake_cased () {}
+
+    public function testCamelCased () {}
+
+    /**
+     * @depends testCamelCased
+     */
+    public function test_depends_on_someone () {}
+
+    //It even has a comment
+    public function a_helper_function () {}
+
+    /**
+     * @depends depends_on_someone
+     */
+    public function testMoreDepends() {}
+}',
+                ['style' => 'annotation'],
+            ],
+            'Annotation has to be added to multiple functions' => [
+                '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    /**
+     * @test
+     */
+    public function itWorks() {}
+    /**
+     * @test
+     */
+
+    public function itDoesSomething() {}
+}',
+                '<?php
+class Test extends \PhpUnit\FrameWork\TestCase
+{
+    public function testItWorks() {}
+
+    public function testItDoesSomething() {}
+}',
+                ['style' => 'annotation'],
+            ],
         ];
     }
 }
