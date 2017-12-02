@@ -61,7 +61,7 @@ class Test extends \PhpUnit\FrameWork\TestCase
     /**
      */
     public function testItDoesSomething() {}
-    }',
+}',
                 '<?php
 class Test extends \PhpUnit\FrameWork\TestCase
 {
@@ -69,7 +69,7 @@ class Test extends \PhpUnit\FrameWork\TestCase
      * @test
      */
     public function itDoesSomething() {}
-    }',
+}',
                 ['style' => 'prefix'],
             ],
             'Annotation is not used, but should be' => [
@@ -85,6 +85,26 @@ class Test extends \PhpUnit\FrameWork\TestCase
 class Test extends \PhpUnit\FrameWork\TestCase
 {
     public function testItDoesSomething() {}
+}',
+                ['style' => 'annotation'],
+            ],
+            'Annotation is not used, but should be, class is extra indented' => [
+                '<?php
+if (1) {
+    class Test extends \PhpUnit\FrameWork\TestCase
+    {
+        /**
+         * @test
+         */
+        public function itDoesSomething() {}
+    }
+}',
+                '<?php
+if (1) {
+    class Test extends \PhpUnit\FrameWork\TestCase
+    {
+        public function testItDoesSomething() {}
+    }
 }',
                 ['style' => 'annotation'],
             ],
