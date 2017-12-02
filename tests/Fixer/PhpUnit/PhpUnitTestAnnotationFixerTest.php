@@ -331,6 +331,12 @@ class Test extends \PhpUnit\FrameWork\TestCase
      * @depends depends_on_someone
      */
     public function moreDepends() {}
+
+    /**
+     * @test
+     * @depends depends_on_someone
+     */
+    public function alreadyAnnotated() {}
 }',
                 '<?php
 class Test extends \PhpUnit\FrameWork\TestCase
@@ -348,9 +354,15 @@ class Test extends \PhpUnit\FrameWork\TestCase
     public function a_helper_function () {}
 
     /**
-     * @depends depends_on_someone
+     * @depends test_depends_on_someone
      */
     public function testMoreDepends() {}
+
+    /**
+     * @test
+     * @depends test_depends_on_someone
+     */
+    public function alreadyAnnotated() {}
 }',
                 ['style' => 'annotation'],
             ],
